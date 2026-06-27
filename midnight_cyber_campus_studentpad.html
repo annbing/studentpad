@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudentPad - Cozy Peer Subleasing</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cozy: {
+                            bg: '#F4F7FB',       /* Cool Ice Blue-Gray */
+                            bgCard: '#FFFFFF',   /* Pure White */
+                            primary: '#0F1E36',  /* Deep Midnight Navy Trust */
+                            accent: '#2563EB',   /* Electric Sapphire Blue */
+                            accentLight: '#EFF6FF', /* Softest Ice Blue */
+                            sage: '#0284C7',     /* Sky Blue */
+                            sageLight: '#E0F2FE', /* Soft Sky Light */
+                            border: '#E2E8F0',   /* Crisp Light Blue-Gray Border */
+                            textDark: '#0F172A', /* Midnight Slate */
+                            textMuted: '#64748B' /* Cool Slate Gray */
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- React and Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght=0,400;0,700;1,400&family=Plus+Jakarta+Sans:wght=300;400;500;600;700;800&family=Inter:wght=300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            background-color: #F4F7FB;
+            cursor: none; /* Hide default cursor to show cozy cursor */
+            overflow-x: hidden;
+            color: #0F172A;
+        }
+
+        /* Enforce custom cursor override on hoverables */
+        a, button, select, input, textarea, [role="button"] {
+            cursor: none !important;
+        }
+
+        /* Cozy House Outline Cursor */
+        .cozy-house-cursor {
+            width: 16px;
+            height: 16px;
+            position: fixed;
+            pointer-events: none;
+            z-index: 10000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s, filter 0.2s;
+            color: #2563EB; /* Modern Sapphire Blue */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cozy-house-cursor.clicking {
+            transform: translate(-50%, -50%) scale(0.8);
+            color: #0F1E36; /* Deep Midnight Navy on click */
+        }
+
+        .cozy-house-cursor.hovering-link {
+            transform: translate(-50%, -50%) scale(1.3);
+            color: #0284C7; /* Sky Blue on hover */
+            filter: drop-shadow(0 0 6px rgba(2, 132, 199, 0.4));
+        }
+
+        /* Premium Floating Paper Drop Shadow */
+        .cozy-shadow-sm {
+            box-shadow: 0 4px 12px rgba(15, 30, 54, 0.04);
+        }
+        .cozy-shadow {
+            box-shadow: 0 12px 30px rgba(15, 30, 54, 0.06);
+        }
+        .cozy-shadow-lg {
+            box-shadow: 0 20px 40px rgba(15, 30, 54, 0.09);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F4F7FB;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #E2E8F0;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #CBD5E1;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen relative selection:bg-cozy-accentLight selection:text-cozy-accent">
+    
+    <!-- Custom cozy house outline cursor -->
+    <div id="cozy-house" class="cozy-house-cursor hidden md:block">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-full h-full">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+    </div>
+
+    <!-- Soft, ambient colored blobs for cozy backdrop -->
+    <div class="absolute top-20 left-10 w-[500px] h-[500px] rounded-full bg-cozy-accentLight/40 blur-[120px] pointer-events-none -z-10"></div>
+    <div class="absolute bottom-40 right-10 w-[600px] h-[600px] rounded-full bg-cozy-sageLight/50 blur-[130px] pointer-events-none -z-10"></div>
+
+    <div id="root" class="relative z-10 flex flex-col min-h-screen"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // High visibility Twitter-style Verified Rosette badge
+        const VerifiedBadge = () => (
+            <span className="inline-flex items-center shrink-0 ml-1.5" title="Academic Status Confirmed">
+                <svg className="w-5 h-5 text-blue-500 fill-current drop-shadow-sm" viewBox="0 0 24 24">
+                    <path d="M22.5 12.5c0-1.58-.875-2.95-2.148-3.6.154-.435.238-.905.238-1.4 0-2.21-1.71-3.99-3.818-3.99-.48 0-.936.1-1.354.27C14.78 2.5 13.51 1.5 12 1.5s-2.78 1-3.418 2.28c-.418-.17-.874-.27-1.354-.27C5.128 3.51 3.42 5.29 3.42 7.5c0 .495.084.965.238 1.4-1.273.65-2.148 2.02-2.148 3.6 0 1.58.875 2.95 2.148 3.6-.154.435-.238.905-.238 1.4 0 2.21 1.71 3.99 3.818 3.99.48 0 .936-.1 1.354-.27.638 1.28 1.908 2.28 3.418 2.28s2.78-1 3.418-2.28c.418.17.874.27 1.354.27 2.108 0 3.818-1.78 3.818-3.99 0-.495-.084-.965-.238-1.4 1.273-.65 2.148-2.02 2.148-3.6zm-12.72 4.41L5.5 12.63l1.43-1.4 2.85 2.8 6.72-6.59 1.43 1.4-8.15 7.97z" />
+                </svg>
+            </span>
+        );
+
+        const INITIAL_LISTINGS = [
+            {
+                id: 1,
+                title: "Bright & Warm Study Suite near North Gate",
+                university: "UC Berkeley",
+                rent: 1250,
+                term: "Fall 2026",
+                dates: "Aug 2026 - Dec 2026",
+                furnishing: "Fully Furnished",
+                roommates: "2 Female Roommates",
+                landlordApproved: true,
+                tag: "Quiet Study Friendly",
+                image: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80",
+                description: "I am studying abroad in Madrid for the Fall semester and looking to sublease my gorgeous room. The apartment has plenty of natural light, a massive shared living space, and is only a short, 5-minute walk from campus. You'll be living with two wonderfully sweet, clean senior majoring in Environmental Sciences.",
+                host: {
+                    name: "Chloe Henderson",
+                    email: "chloe.h@berkeley.edu",
+                    verified: true,
+                    major: "Architecture, Class of 2027",
+                    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80"
+                }
+            },
+            {
+                id: 2,
+                title: "Cozy High-Rise Studio steps from Washington Square",
+                university: "NYU",
+                rent: 2150,
+                term: "Summer 2026",
+                dates: "Jun 2026 - Aug 2026",
+                furnishing: "Fully Furnished",
+                roommates: "No Roommates (Entire Studio)",
+                landlordApproved: true,
+                tag: "Workplace Ready",
+                image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+                description: "Subleasing my studio apartment while I head to Chicago for a summer product design internship. Located directly next to Washington Square Park. High ceilings, gorgeous tall windows, cozy brick accents, and a dedicated workspace. Fully verified with my building management for subtenant peace of mind.",
+                host: {
+                    name: "Arthur Pendelton",
+                    email: "arthur.p@nyu.edu",
+                    verified: false,
+                    major: "Interactive Media, Class of 2028",
+                    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80"
+                }
+            },
+            {
+                id: 3,
+                title: "Sunny West Campus Bungalow Bedroom",
+                university: "UT Austin",
+                rent: 890,
+                term: "Spring 2027",
+                dates: "Jan 2027 - May 2027",
+                furnishing: "Partially Furnished",
+                roommates: "3 Male Roommates",
+                landlordApproved: true,
+                tag: "Social Community",
+                image: "https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80",
+                description: "Heading out for an internship program in Washington D.C. next Spring. Subleasing my fully furnished bedroom in our charming West Campus house. Great leafy backyard with a patio, in-unit washer/dryer, and a dedicated parking spot. The roommates are friendly UT undergrads who love music and intramural sports.",
+                host: {
+                    name: "Jackson Miller",
+                    email: "j.miller@utexas.edu",
+                    verified: true,
+                    major: "Public Policy, Class of 2027",
+                    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80"
+                }
+            },
+            {
+                id: 4,
+                title: "Tech Square Loft Suite",
+                university: "Georgia Tech",
+                rent: 1120,
+                term: "Fall 2026",
+                dates: "Aug 2026 - Dec 2026",
+                furnishing: "Fully Furnished",
+                roommates: "1 Male Roommate",
+                landlordApproved: false,
+                tag: "Cozy & Quiet",
+                image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+                description: "Subleasing 1 private room & bathroom in a gorgeous 2B/2B apartment directly next to Tech Square. Ideal for walking to classes or grabbing coffee. Modern stainless appliances, cozy living area, access to gym and rooftop lounge. Roommate is an aerospace student who appreciates quiet study environments.",
+                host: {
+                    name: "David Kim",
+                    email: "dkim@gatech.edu",
+                    verified: false,
+                    major: "Computer Science, Class of 2028",
+                    avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=150&q=80"
+                }
+            }
+        ];
+
+        const INITIAL_CHATS = [
+            {
+                id: 1,
+                partner: {
+                    name: "Chloe Henderson",
+                    university: "UC Berkeley",
+                    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+                    verified: true
+                },
+                listingTitle: "Bright & Warm Study Suite near North Gate",
+                messages: [
+                    { sender: 'them', text: "Hi! Thanks for reaching out. The room is definitely still available for Fall 2026. The wifi setup is extremely fast!", time: "10:30 AM" },
+                    { sender: 'me', text: "That sounds amazing! Are utilities included in the $1,250 rent?", time: "10:32 AM" },
+                    { sender: 'them', text: "Yes! High-speed internet, water, and trash collection are all covered.", time: "10:35 AM" }
+                ]
+            }
+        ];
+
+        const CardCornerDecor = () => (
+            <div className="absolute top-0 right-0 w-8 h-8 pointer-events-none overflow-hidden">
+                <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-cozy-accent/30 rounded-tr-md"></div>
+            </div>
+        );
+
+        function LiveWalkthroughDemo() {
+            const [isPlaying, setIsPlaying] = useState(true);
+            const [step, setStep] = useState(0); // 0: Browse, 1: Google Map View, 2: Secure messaging
+            const [timer, setTimer] = useState(0); // progress bar 0 to 100
+
+            const stepsData = [
+                {
+                    title: "Step 1: Explore Structured Listings",
+                    desc: "Sift through clean, pre-verified campus apartments without the social media noise.",
+                    badge: "STABLE & SECURE",
+                    color: "border-cozy-accent"
+                },
+                {
+                    title: "Step 2: Google Maps Neighborhood View",
+                    desc: "Map layout of the subtenant zone. Clear walking routes tracing coordinates directly to your lecture hall.",
+                    badge: "GOOGLE MAP INTEGRATION",
+                    color: "border-cozy-sage"
+                },
+                {
+                    title: "Step 3: Direct Secure Chat",
+                    desc: "Agree on timelines, verify landlord permissions, and complete sublease matches instantly.",
+                    badge: "TIMELINE MATCHED",
+                    color: "border-cozy-primary"
+                }
+            ];
+
+            useEffect(() => {
+                let interval;
+                if (isPlaying) {
+                    interval = setInterval(() => {
+                        setTimer((prev) => {
+                            if (prev >= 100) {
+                                setStep((prevStep) => (prevStep + 1) % 3);
+                                return 0;
+                            }
+                            return prev + 1.25; // timing speed
+                        });
+                    }, 50);
+                }
+                return () => clearInterval(interval);
+            }, [isPlaying]);
+
+            const jumpToStep = (index) => {
+                setStep(index);
+                setTimer(0);
+            };
+
+            return (
+                <div className="bg-cozy-bgCard border border-cozy-border rounded-3xl p-6 md:p-8 cozy-shadow relative flex flex-col justify-between overflow-hidden">
+                    <CardCornerDecor />
+                    
+                    {/* Header info */}
+                    <div className="flex items-center justify-between border-b border-cozy-border pb-4 mb-6">
+                        <div>
+                            <span className="text-[10px] uppercase font-extrabold tracking-wider text-cozy-accent block">Live Walkthrough</span>
+                            <h3 className="text-lg font-serif italic text-cozy-primary">StudentPad App Demo</h3>
+                        </div>
+                        <div className="flex space-x-1">
+                            {[0, 1, 2].map((i) => (
+                                <button 
+                                    key={i}
+                                    onClick={() => jumpToStep(i)}
+                                    className={`w-3.5 h-3.5 rounded-full transition-all border ${step === i ? 'bg-cozy-accent border-cozy-accent scale-110' : 'bg-cozy-border border-cozy-border'}`}
+                                    title={`Jump to scene ${i + 1}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Animated Stage Display Box */}
+                    <div className="bg-cozy-bg border border-cozy-border rounded-2xl p-6 h-56 flex flex-col justify-center items-center relative overflow-hidden">
+                        
+                        {/* --- SCENE 0: BROWSE --- */}
+                        {step === 0 && (
+                            <div className="w-full max-w-sm space-y-3 animate-fade-in text-center">
+                                <div className="inline-block bg-cozy-accentLight text-cozy-accent font-bold text-[10px] px-2.5 py-1 rounded-full uppercase">
+                                    Browse Berkeley
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-cozy-border shadow-xs text-left flex items-center space-x-3">
+                                    <div className="w-12 h-12 rounded-lg bg-cozy-accent/10 flex items-center justify-center text-xl">🏠</div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-xs text-cozy-primary truncate">Bright Study Suite</p>
+                                        <p className="text-[10px] text-cozy-textMuted font-medium">Fall 2026 • UC Berkeley</p>
+                                    </div>
+                                    <span className="text-xs font-bold text-cozy-accent">$1,250/mo</span>
+                                </div>
+                                <div className="text-[11px] text-cozy-textMuted italic font-medium">Filtering by semesters & direct landlord approval status...</div>
+                            </div>
+                        )}
+
+                        {/* --- SCENE 1: HIGH FIDELITY GOOGLE MAPS LAYOUT --- */}
+                        {step === 1 && (
+                            <div className="w-full h-full relative overflow-hidden rounded-xl border border-cozy-border bg-[#F4F3F0] animate-fade-in">
+                                {/* Map Background Graphics Grid (Local white streets & soft green parks) */}
+                                <div className="absolute inset-0 opacity-80 pointer-events-none">
+                                    {/* Green park patches */}
+                                    <div className="absolute top-2 left-4 w-28 h-20 bg-[#E8F5E9] rounded-lg"></div>
+                                    <div className="absolute bottom-4 right-6 w-32 h-16 bg-[#E8F5E9] rounded-lg"></div>
+                                    {/* Local grid street lines */}
+                                    <div className="absolute top-10 left-0 right-0 h-[2px] bg-white"></div>
+                                    <div className="absolute top-28 left-0 right-0 h-[2px] bg-white"></div>
+                                    <div className="absolute bottom-12 left-0 right-0 h-[2px] bg-white"></div>
+                                    <div className="absolute left-16 top-0 bottom-0 w-[2px] bg-white"></div>
+                                    <div className="absolute left-48 top-0 bottom-0 w-[2px] bg-white"></div>
+                                    {/* Yellow Arterial Avenue */}
+                                    <div className="absolute left-32 top-0 bottom-0 w-8 bg-[#FFE082] border-l border-r border-[#FFF59D]"></div>
+                                </div>
+
+                                {/* Floating Google Search Box Mockup */}
+                                <div className="absolute top-2 left-2 right-2 bg-white rounded shadow-sm border border-cozy-border p-1.5 flex items-center justify-between text-[10px] text-cozy-textMuted">
+                                    <div className="flex items-center space-x-1.5">
+                                        <span className="text-xs text-cozy-accent">🔍</span>
+                                        <span className="font-bold text-cozy-primary truncate">UC Berkeley North Gate...</span>
+                                    </div>
+                                    <span className="text-xs">⚲</span>
+                                </div>
+
+                                {/* Active blue route trace lines */}
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M 64 160 L 138 120 L 138 48" fill="none" stroke="#2B6CB0" strokeWidth="4.5" strokeLinecap="round" strokeDasharray="3 3" opacity="0.9" />
+                                </svg>
+
+                                {/* Price / Home pin tags */}
+                                <div className="absolute top-10 left-8 transform -translate-x-1/2 -translate-y-1/2">
+                                    <div className="bg-white border border-cozy-border rounded px-1.5 py-0.5 shadow-sm text-[8px] font-bold text-cozy-primary flex items-center space-x-1">
+                                        <span>🏠</span> <span>$1,250</span>
+                                    </div>
+                                    <div className="w-1.5 h-1.5 bg-[#1A365D] rounded-full mx-auto mt-0.5"></div>
+                                </div>
+
+                                <div className="absolute bottom-16 right-16 transform translate-x-1/2 translate-y-1/2">
+                                    <div className="bg-cozy-accent text-white border border-cozy-border rounded px-1.5 py-0.5 shadow-sm text-[8px] font-bold flex items-center space-x-1">
+                                        <span>📍</span> <span>$890</span>
+                                    </div>
+                                    <div className="w-1.5 h-1.5 bg-cozy-accent rounded-full mx-auto mt-0.5"></div>
+                                </div>
+
+                                {/* Campus Gate terminal node */}
+                                <div className="absolute top-10 left-36 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                                    <span className="bg-emerald-500 text-white rounded-full text-[9px] px-1.5 py-0.5 font-bold shadow-xs">Campus Entry</span>
+                                    <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white mx-auto mt-0.5 animate-ping"></div>
+                                </div>
+
+                                {/* Google Route floating summary */}
+                                <div className="absolute bottom-2 left-2 bg-white/95 backdrop-blur-xs border border-cozy-border rounded-lg p-1.5 shadow-xs text-[9px]">
+                                    <p className="font-bold text-cozy-primary">🚶 6 min walk (0.3 mi)</p>
+                                    <p className="text-[8px] text-cozy-textMuted">Via Ridge Road & Scenic Way</p>
+                                </div>
+
+                                {/* Google standard zoom & compass icons */}
+                                <div className="absolute right-2 bottom-2 flex flex-col space-y-1">
+                                    <button className="w-4 h-4 bg-white border border-cozy-border rounded-sm flex items-center justify-center text-[9px] font-bold text-cozy-primary cursor-none">+</button>
+                                    <button className="w-4 h-4 bg-white border border-cozy-border rounded-sm flex items-center justify-center text-[9px] font-bold text-cozy-primary cursor-none">-</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- SCENE 2: SECURE CHAT --- */}
+                        {step === 2 && (
+                            <div className="w-full max-w-sm space-y-3 animate-fade-in text-xs">
+                                <div className="bg-white p-2.5 rounded-xl border border-cozy-border text-left shadow-xs max-w-[85%]">
+                                    <p className="text-cozy-textDark">Is your space near Washington Square Park available for Summer?</p>
+                                    <span className="text-[8px] uppercase tracking-wider text-cozy-textMuted block mt-1">Student seeker</span>
+                                </div>
+                                <div className="bg-cozy-primary text-white p-2.5 rounded-xl text-left shadow-xs max-w-[85%] ml-auto">
+                                    <p>Yes! It's fully pre-approved by the landlord for sublet compliance.</p>
+                                    <span className="text-[8px] uppercase tracking-wider text-white/70 block mt-1">Host • Arthur P.</span>
+                                </div>
+                            </div>
+                        )}
+                        
+                    </div>
+
+                    {/* Progress details & controls */}
+                    <div className="mt-6 space-y-4">
+                        <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                                <span className="inline-block bg-cozy-sageLight text-cozy-sage text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+                                    {stepsData[step].badge}
+                                </span>
+                                <h4 className="font-bold text-xs text-cozy-primary font-serif">{stepsData[step].title}</h4>
+                                <p className="text-[11px] text-cozy-textMuted leading-relaxed max-w-md">{stepsData[step].desc}</p>
+                            </div>
+                            
+                            {/* Play/Pause Button */}
+                            <button 
+                                onClick={() => setIsPlaying(!isPlaying)}
+                                className="w-10 h-10 rounded-full bg-cozy-primary hover:bg-cozy-primary/95 text-white flex items-center justify-center shadow-xs cursor-none transition-transform active:scale-95"
+                                title={isPlaying ? "Pause Demo" : "Play Demo"}
+                            >
+                                {isPlaying ? "⏸" : "▶"}
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        function CampusFlowVisualizer() {
+            const [activeHub, setActiveHub] = useState('departures');
+
+            const hubData = {
+                departures: {
+                    number: "300,000+",
+                    title: "Annual Departures",
+                    desc: "U.S. university students heading overseas for study abroad, summer terms, and winter semesters."
+                },
+                nodes: {
+                    number: "20,000,000+",
+                    title: "Active Students",
+                    desc: "The total addressable network of peers seeking flexible timelines and compatible room matches."
+                },
+                security: {
+                    number: "100% Verified",
+                    title: "Safe Handshake",
+                    desc: "A strictly closed database requiring verified active academic credentials to converse."
+                }
+            };
+
+            return (
+                <div className="bg-cozy-bgCard border border-cozy-border rounded-2xl p-4 cozy-shadow max-w-3xl mx-auto relative overflow-hidden">
+                    <CardCornerDecor />
+                    
+                    {/* Compact Typographic Segments - No dotted lines, no mismatched icons, minimal height */}
+                    <div className="grid grid-cols-3 gap-2 border-b border-cozy-border pb-3">
+                        {Object.keys(hubData).map((key) => (
+                            <button
+                                key={key}
+                                onClick={() => setActiveHub(key)}
+                                className={`text-center py-3 px-2 rounded-xl transition-all duration-200 cursor-none ${activeHub === key ? 'bg-cozy-accentLight/60 text-cozy-accent' : 'hover:bg-cozy-bg text-cozy-textMuted'}`}
+                            >
+                                <span className={`block text-xl md:text-2xl font-extrabold tracking-tight transition-colors duration-200 ${activeHub === key ? 'text-cozy-accent' : 'text-cozy-primary'}`}>
+                                    {hubData[key].number}
+                                </span>
+                                <span className="text-[10px] uppercase font-extrabold tracking-wider block mt-0.5">
+                                    {hubData[key].title}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Smooth slide-in style single descriptive sentence */}
+                    <div className="pt-3 text-center min-h-[44px] flex items-center justify-center px-4">
+                        <p className="text-xs text-cozy-textMuted leading-relaxed max-w-xl transition-all duration-300">
+                            {hubData[activeHub].desc}
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [view, setView] = useState('landing'); // 'landing', 'marketplace', 'messages', 'post'
+            const [listings, setListings] = useState(INITIAL_LISTINGS);
+            const [selectedListing, setSelectedListing] = useState(null);
+            
+            // Search Filters
+            const [searchQuery, setSearchQuery] = useState('');
+            const [univFilter, setUnivFilter] = useState('All Universities');
+            const [termFilter, setTermFilter] = useState('All Terms');
+            const [priceFilter, setPriceFilter] = useState(2500);
+
+            // Messaging Simulation
+            const [chats, setChats] = useState(INITIAL_CHATS);
+            const [activeChatId, setActiveChatId] = useState(1);
+            const [typedMessage, setTypedMessage] = useState('');
+
+            // Verification Simulation State
+            const [verifiedUser, setVerifiedUser] = useState(false);
+            const [emailInput, setEmailInput] = useState('');
+            const [showVerifyModal, setShowVerifyModal] = useState(false);
+            const [verifying, setVerifying] = useState(false);
+            const [verifyProgress, setVerifyProgress] = useState(0);
+
+            // Custom Notification Toast
+            const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+            // Form states
+            const [newListing, setNewListing] = useState({
+                title: '',
+                university: 'UC Berkeley',
+                rent: '',
+                term: 'Fall 2026',
+                dates: '',
+                furnishing: 'Fully Furnished',
+                roommates: '',
+                landlordApproved: true,
+                tag: 'Study Space',
+                description: '',
+                image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80'
+            });
+
+            const triggerToast = (message, type = 'success') => {
+                setToast({ show: true, message, type });
+                setTimeout(() => {
+                    setToast({ show: false, message: '', type: 'success' });
+                }, 4000);
+            };
+
+            // Custom Cozy Pointer logic - completely fixed container target bindings
+            useEffect(() => {
+                const cozyHouse = document.getElementById('cozy-house');
+
+                const handleMouseMove = (e) => {
+                    if (cozyHouse) {
+                        // Position the element smoothly over coordinates
+                        cozyHouse.style.left = `${e.clientX}px`;
+                        cozyHouse.style.top = `${e.clientY}px`;
+                    }
+                };
+
+                const handleMouseDown = () => {
+                    if (cozyHouse) cozyHouse.classList.add('clicking');
+                };
+
+                const handleMouseUp = () => {
+                    if (cozyHouse) cozyHouse.classList.remove('clicking');
+                };
+
+                const handleMouseOverLink = (e) => {
+                    const tag = e.target.tagName;
+                    const isHoverable = tag === 'BUTTON' || tag === 'A' || tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || e.target.closest('[role="button"]') || e.target.closest('.interactive-card');
+                    if (isHoverable && cozyHouse) {
+                        cozyHouse.classList.add('hovering-link');
+                    }
+                };
+
+                const handleMouseOutLink = (e) => {
+                    if (cozyHouse) {
+                        cozyHouse.classList.remove('hovering-link');
+                    }
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mousedown', handleMouseDown);
+                window.addEventListener('mouseup', handleMouseUp);
+                window.addEventListener('mouseover', handleMouseOverLink);
+                window.addEventListener('mouseout', handleMouseOutLink);
+
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    window.removeEventListener('mousedown', handleMouseDown);
+                    window.removeEventListener('mouseup', handleMouseUp);
+                    window.removeEventListener('mouseover', handleMouseOverLink);
+                    window.removeEventListener('mouseout', handleMouseOutLink);
+                };
+            }, []);
+
+            // Handle simulation of university email verification
+            const handleVerificationSubmit = (e) => {
+                e.preventDefault();
+                if (emailInput.toLowerCase().endsWith('.edu')) {
+                    setVerifying(true);
+                    setVerifyProgress(0);
+
+                    // Incremental progress bar
+                    const interval = setInterval(() => {
+                        setVerifyProgress(prev => {
+                            if (prev >= 100) {
+                                clearInterval(interval);
+                                setVerifying(false);
+                                setVerifiedUser(true);
+                                setShowVerifyModal(false);
+                                triggerToast("Academic network linked!", "success");
+                                return 100;
+                            }
+                            return prev + 20;
+                        });
+                    }, 150);
+                } else {
+                    triggerToast("Verification failed. Please enter a valid university address ending in .edu", "error");
+                }
+            };
+
+            // Post a new student sublet
+            const handleCreateListing = (e) => {
+                e.preventDefault();
+                const freshListing = {
+                    ...newListing,
+                    id: listings.length + 1,
+                    rent: Number(newListing.rent),
+                    host: {
+                        name: "Sam Crawford",
+                        email: emailInput || "sam.c@verified.edu",
+                        verified: true,
+                        major: "Economics, Class of 2027",
+                        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"
+                    }
+                };
+                setListings([freshListing, ...listings]);
+                triggerToast("Success! Your student sublet is now broadcasting to campus circles.", "success");
+                setView('marketplace');
+            };
+
+            // Messaging thread simulator
+            const handleSendMessage = (e) => {
+                e.preventDefault();
+                if (!typedMessage.trim()) return;
+
+                const updatedChats = chats.map(chat => {
+                    if (chat.id === activeChatId) {
+                        return {
+                            ...chat,
+                            messages: [...chat.messages, { sender: 'me', text: typedMessage, time: 'Just now' }]
+                        };
+                    }
+                    return chat;
+                });
+                setChats(updatedChats);
+                setTypedMessage('');
+
+                // Mocking auto-respond sequence
+                setTimeout(() => {
+                    const finalChats = updatedChats.map(chat => {
+                        if (chat.id === activeChatId) {
+                            return {
+                                ...chat,
+                                messages: [...chat.messages, { sender: 'them', text: "That sounds perfect! Let's arrange a time to jump on a brief video call to map out dates.", time: 'Now' }]
+                            };
+                        }
+                        return chat;
+                    });
+                    setChats(finalChats);
+                    triggerToast("New message notification from peer host.", "success");
+                }, 1800);
+            };
+
+            // Open chat session with a sublet host
+            const handleContactHost = (listing) => {
+                const matchedChat = chats.find(c => c.partner.name === listing.host.name);
+                if (matchedChat) {
+                    setActiveChatId(matchedChat.id);
+                } else {
+                    const freshChat = {
+                        id: chats.length + 1,
+                        partner: {
+                            name: listing.host.name,
+                            university: listing.university,
+                            avatar: listing.host.avatar,
+                            verified: listing.host.verified
+                        },
+                        listingTitle: listing.title,
+                        messages: [
+                            { sender: 'me', text: `Hello! I noticed your listing: "${listing.title}" on StudentPad. Is it available to tour or discuss?`, time: 'Just now' }
+                        ]
+                    };
+                    setChats([freshChat, ...chats]);
+                    setActiveChatId(freshChat.id);
+                }
+                setView('messages');
+                setSelectedListing(null);
+            };
+
+            // Filter logic
+            const filteredListings = listings.filter(l => {
+                const textMatch = l.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                  l.university.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                  l.description.toLowerCase().includes(searchQuery.toLowerCase());
+                const univMatch = univFilter === 'All Universities' || l.university === univFilter;
+                const termMatch = termFilter === 'All Terms' || l.term === termFilter;
+                const priceMatch = l.rent <= priceFilter;
+                return textMatch && univMatch && termMatch && priceMatch;
+            });
+
+            return (
+                <div className="flex flex-col min-h-screen">
+                    
+                    {/* --- SYSTEM NOTIFICATION TOAST --- */}
+                    {toast.show && (
+                        <div className="fixed top-8 right-8 z-[1001] max-w-sm w-full animate-bounce">
+                            <div className="p-4 rounded-2xl bg-cozy-bgCard border border-cozy-border shadow-lg flex items-center space-x-3 relative">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${toast.type === 'success' ? 'bg-cozy-sageLight text-cozy-sage' : 'bg-red-50 text-red-500'}`}>
+                                    {toast.type === 'success' ? '✓' : 'ℹ'}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs font-semibold text-cozy-textDark">{toast.message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- COZY PREMIUM HEADER --- */}
+                    <header className="sticky top-0 bg-cozy-bg/95 backdrop-blur-md border-b border-cozy-border z-50 px-4 lg:px-12 py-4 flex items-center justify-between">
+                        <div className="flex items-center space-x-3 cursor-none" onClick={() => setView('landing')}>
+                            <div className="w-10 h-10 rounded-full bg-cozy-accent flex items-center justify-center text-white font-extrabold text-lg shadow-sm">
+                                🏠
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold text-cozy-primary uppercase tracking-wide">
+                                    Student<span className="text-cozy-accent">Pad</span>
+                                </h1>
+                                <span className="block text-[9px] text-cozy-textMuted uppercase font-bold tracking-widest -mt-1">
+                                    The Trusted Student Marketplace
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Interactive Nav bar */}
+                        <nav className="hidden md:flex items-center space-x-1 bg-cozy-border/30 p-1.5 rounded-full">
+                            <button 
+                                onClick={() => setView('landing')} 
+                                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${view === 'landing' ? 'bg-cozy-bgCard text-cozy-primary shadow-sm' : 'text-cozy-textMuted hover:text-cozy-primary'}`}
+                            >
+                                Overview
+                            </button>
+                            <button 
+                                onClick={() => setView('marketplace')} 
+                                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${view === 'marketplace' ? 'bg-cozy-bgCard text-cozy-primary shadow-sm' : 'text-cozy-textMuted hover:text-cozy-primary'}`}
+                            >
+                                Explore Housing
+                            </button>
+                            <button 
+                                onClick={() => setView('messages')} 
+                                className={`px-5 py-2 rounded-full text-xs font-semibold transition-all ${view === 'messages' ? 'bg-cozy-bgCard text-cozy-primary shadow-sm' : 'text-cozy-textMuted hover:text-cozy-primary'}`}
+                            >
+                                Inbox {chats.length > 0 && <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-cozy-accent text-white rounded-full">!</span>}
+                            </button>
+                        </nav>
+
+                        <div className="flex items-center space-x-3">
+                            {verifiedUser ? (
+                                <div className="bg-cozy-sageLight border border-cozy-sage/20 text-cozy-sage text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 shadow-sm">
+                                    <VerifiedBadge />
+                                    <span>Active Student</span>
+                                </div>
+                            ) : (
+                                <button 
+                                    onClick={() => setShowVerifyModal(true)} 
+                                    className="bg-cozy-accentLight hover:bg-cozy-accent/10 border border-cozy-accent/20 text-cozy-accent text-xs font-bold px-4 py-2 rounded-full transition-all"
+                                >
+                                    Verify (.edu)
+                                </button>
+                            )}
+
+                            <button 
+                                onClick={() => setView('post')} 
+                                className="bg-cozy-primary hover:bg-cozy-primary/90 text-white text-xs font-bold px-6 py-2.5 rounded-full shadow-sm transition-all"
+                            >
+                                List
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* --- MAIN PAGE VIEWS --- */}
+                    <main className="flex-1">
+
+                        {/* --- LANDING OVERVIEW PAGE --- */}
+                        {view === 'landing' && (
+                            <div className="max-w-7xl mx-auto px-4 lg:px-12 py-12 space-y-16">
+                                
+                                {/* Cozy Hero Section */}
+                                <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                                    <div className="lg:col-span-6 space-y-6">
+                                        <div className="inline-flex items-center bg-cozy-accentLight text-cozy-accent text-xs font-bold px-3.5 py-1.5 rounded-full shadow-xs">
+                                            🎓 Closed Loop Student Subleasing
+                                        </div>
+
+                                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-cozy-primary tracking-tight font-serif leading-tight">
+                                            The secure, <span className="italic text-cozy-accent">peer-to-peer</span> marketplace.
+                                        </h2>
+
+                                        <p className="text-cozy-textMuted text-sm max-w-md leading-relaxed">
+                                            No fraudulent listings, no unverified accounts, and zero Craigslist complexity. Link your active college address and immediately sync subleasing matches with approved peers.
+                                        </p>
+
+                                        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 pt-2">
+                                            <button 
+                                                onClick={() => setView('marketplace')} 
+                                                className="bg-cozy-accent hover:bg-cozy-accent/90 text-white font-bold text-xs uppercase tracking-wider px-8 py-4.5 rounded-full shadow-md hover:shadow-lg transition duration-200"
+                                            >
+                                                Explore Housing
+                                            </button>
+                                            <button 
+                                                onClick={() => setShowVerifyModal(true)} 
+                                                className="border border-cozy-border bg-cozy-bgCard hover:bg-cozy-bg font-bold text-xs uppercase tracking-wider px-8 py-4.5 rounded-full text-cozy-primary hover:shadow-xs transition duration-200"
+                                            >
+                                                Verify Your .Edu
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Video Walks Block replacement of heavy Pitch Explorer */}
+                                    <div className="lg:col-span-6">
+                                        <LiveWalkthroughDemo />
+                                    </div>
+                                </section>
+
+                                {}
+                                {/* Uniquely web-styled, interactive ecosystem map (instead of standard cards) */}
+                                <section className="space-y-6 text-center">
+                                    <div className="max-w-2xl mx-auto space-y-2">
+                                        <h3 className="text-2xl md:text-3xl font-extrabold text-cozy-primary font-serif italic">The Student Ecosystem Map</h3>
+                                        <p className="text-xs text-cozy-textMuted max-w-md mx-auto">
+                                            A closed-loop subleasing network active across hundreds of universities. Tap different nodes of the cycle to explore current statistics.
+                                        </p>
+                                    </div>
+                                    
+                                    <CampusFlowVisualizer />
+                                </section>
+
+                            </div>
+                        )}
+
+                        {/* --- EXPLORE MARKETPLACE DASHBOARD VIEW --- */}
+                        {view === 'marketplace' && (
+                            <div className="max-w-7xl mx-auto px-4 lg:px-12 py-8">
+                                <div className="flex flex-col lg:flex-row gap-8">
+                                    
+                                    {/* Sidebar filter controls */}
+                                    <aside className="w-full lg:w-1/4 bg-cozy-bgCard border border-cozy-border p-6 rounded-2xl h-fit space-y-6">
+                                        <div className="border-b border-cozy-border pb-3 flex items-center justify-between">
+                                            <span className="text-xs font-extrabold text-cozy-primary uppercase tracking-wider">Search Filters</span>
+                                            <span className="w-2 h-2 rounded-full bg-cozy-accent"></span>
+                                        </div>
+
+                                        {/* Search Box */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted block">Campus Query</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="e.g. Berkeley, NYU, bright room..." 
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-xs text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent" 
+                                            />
+                                        </div>
+
+                                        {/* University Select */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted block">University Target</label>
+                                            <select 
+                                                value={univFilter}
+                                                onChange={(e) => setUnivFilter(e.target.value)}
+                                                className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-xs text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                            >
+                                                <option>All Universities</option>
+                                                <option>UC Berkeley</option>
+                                                <option>NYU</option>
+                                                <option>UT Austin</option>
+                                                <option>Georgia Tech</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Term Select */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted block">Semester Slot</label>
+                                            <select 
+                                                value={termFilter}
+                                                onChange={(e) => setTermFilter(e.target.value)}
+                                                className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-xs text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                            >
+                                                <option>All Terms</option>
+                                                <option>Fall 2026</option>
+                                                <option>Spring 2027</option>
+                                                <option>Summer 2026</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Rent Ceiling */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">
+                                                <span>Budget Cap</span>
+                                                <span className="text-cozy-accent">${priceFilter}/mo</span>
+                                            </div>
+                                            <input 
+                                                type="range" 
+                                                min="500" 
+                                                max="2500" 
+                                                step="50"
+                                                value={priceFilter}
+                                                onChange={(e) => setPriceFilter(Number(e.target.value))}
+                                                className="w-full accent-cozy-accent bg-cozy-border rounded-lg appearance-none h-1.5"
+                                            />
+                                        </div>
+
+                                        <button 
+                                            onClick={() => {
+                                                setSearchQuery('');
+                                                setUnivFilter('All Universities');
+                                                setTermFilter('All Terms');
+                                                setPriceFilter(2500);
+                                                triggerToast("Filters restored to defaults.", "success");
+                                            }}
+                                            className="w-full border border-cozy-border hover:bg-cozy-bg font-bold text-xs py-2.5 rounded-xl text-cozy-textMuted transition-all cursor-none"
+                                        >
+                                            Clear Filters
+                                        </button>
+                                    </aside>
+
+                                    {/* Main active sublets displays */}
+                                    <div className="flex-1 space-y-6">
+                                        <div className="flex justify-between items-center text-xs text-cozy-textMuted border-b border-cozy-border pb-3">
+                                            <span>Showing <span className="font-bold text-cozy-primary">{filteredListings.length} cozy spaces</span></span>
+                                            <span>Sort: Recommended</span>
+                                        </div>
+
+                                        {/* Listing Grid */}
+                                        {filteredListings.length === 0 ? (
+                                            <div className="bg-cozy-bgCard border border-cozy-border rounded-2xl p-16 text-center space-y-3 relative">
+                                                <div className="text-4xl">🔍</div>
+                                                <h4 className="font-bold text-sm text-cozy-primary">No Matching Sublets Found</h4>
+                                                <p className="text-xs text-cozy-textMuted max-w-sm mx-auto">Try broadening your search query or adjusting filters to discover available spaces.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {filteredListings.map(listing => (
+                                                    <div 
+                                                        key={listing.id}
+                                                        onClick={() => setSelectedListing(listing)}
+                                                        className="bg-cozy-bgCard border border-cozy-border hover:border-cozy-accent rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-all duration-300 relative flex flex-col justify-between cursor-none group interactive-card"
+                                                    >
+                                                        <CardCornerDecor />
+                                                        
+                                                        <div>
+                                                            {/* Listing thumbnail */}
+                                                            <div className="h-48 relative overflow-hidden bg-cozy-bg">
+                                                                <img src={listing.image} alt={listing.title} className="object-cover w-full h-full group-hover:scale-105 transition-all duration-500" />
+                                                                <div className="absolute top-3 left-3 bg-white border border-cozy-border px-2.5 py-1 rounded-full text-[10px] font-bold text-cozy-primary">
+                                                                    {listing.term}
+                                                                </div>
+                                                                {listing.landlordApproved && (
+                                                                    <div className="absolute top-3 right-3 bg-cozy-sage text-white text-[9px] font-bold px-2.5 py-1 rounded-full">
+                                                                        Landlord Pre-Approved
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Specs block */}
+                                                            <div className="p-5 space-y-3">
+                                                                <div className="flex justify-between items-center text-[10px] font-bold">
+                                                                    <span className="text-cozy-accent uppercase">[{listing.university}]</span>
+                                                                    <span className="text-cozy-textMuted uppercase">{listing.furnishing}</span>
+                                                                </div>
+                                                                
+                                                                <h4 className="font-bold text-cozy-primary text-sm tracking-tight group-hover:text-cozy-accent transition-all line-clamp-1">
+                                                                    {listing.title}
+                                                                </h4>
+
+                                                                <div className="inline-block bg-cozy-sageLight text-cozy-sage text-[10px] font-bold px-2.5 py-1 rounded-full">
+                                                                    {listing.tag}
+                                                                </div>
+
+                                                                {/* Verified Profile - Twitter Blue Rosette Checkmark instead of text */}
+                                                                <div className="flex items-center space-x-2 pt-3 border-t border-cozy-border">
+                                                                    <img src={listing.host.avatar} className="w-6 h-6 rounded-full object-cover" />
+                                                                    <span className="text-[11px] font-semibold text-cozy-textDark">{listing.host.name}</span>
+                                                                    {listing.host.verified && <VerifiedBadge />}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Footer rent block */}
+                                                        <div className="bg-cozy-bg p-4 flex justify-between items-center border-t border-cozy-border">
+                                                            <div>
+                                                                <span className="text-[9px] text-cozy-textMuted uppercase block">Monthly Rent</span>
+                                                                <span className="text-cozy-primary font-extrabold text-sm">${listing.rent}<span className="text-xs font-normal text-cozy-textMuted">/mo</span></span>
+                                                            </div>
+                                                            <span className="bg-cozy-accent text-white text-[10px] font-bold px-4 py-2 rounded-full shadow-xs group-hover:bg-cozy-primary transition-all duration-300">
+                                                                View Details
+                                                            </span>
+                                                        </div>
+
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                    </div>
+
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- INBOX & MESSAGING COMPONENT VIEW --- */}
+                        {view === 'messages' && (
+                            <div className="max-w-6xl mx-auto px-4 lg:px-12 py-8 h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6">
+                                
+                                {/* Message threads list */}
+                                <aside className="w-full md:w-1/3 bg-cozy-bgCard border border-cozy-border rounded-2xl flex flex-col overflow-hidden">
+                                    <div className="p-4 border-b border-cozy-border flex items-center justify-between">
+                                        <span className="text-xs font-bold text-cozy-primary uppercase tracking-wider">Active Conversations</span>
+                                        <span className="w-2.5 h-2.5 rounded-full bg-cozy-sage"></span>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto divide-y divide-cozy-border">
+                                        {chats.map(chat => (
+                                            <div 
+                                                key={chat.id}
+                                                onClick={() => {
+                                                    setActiveChatId(chat.id);
+                                                    triggerToast(`Switched chat to host: ${chat.partner.name}`, "success");
+                                                }}
+                                                className={`p-4 flex items-center space-x-3 cursor-none transition-all ${activeChatId === chat.id ? 'bg-cozy-accentLight/40 border-l-4 border-cozy-accent' : 'hover:bg-cozy-bg'}`}
+                                            >
+                                                <img src={chat.partner.avatar} className="w-9 h-9 rounded-full object-cover" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-baseline">
+                                                        <div className="flex items-center">
+                                                            <span className="font-bold text-xs text-cozy-textDark">{chat.partner.name}</span>
+                                                            {chat.partner.verified && <VerifiedBadge />}
+                                                        </div>
+                                                        <span className="text-[9px] text-cozy-textMuted font-semibold">ACTIVE</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-cozy-accent font-semibold">{chat.partner.university}</p>
+                                                    <p className="text-[11px] text-cozy-textMuted truncate mt-0.5">{chat.messages[chat.messages.length - 1]?.text}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </aside>
+
+                                {/* Main dialogue pane */}
+                                <main className="flex-1 bg-cozy-bgCard border border-cozy-border rounded-2xl flex flex-col overflow-hidden relative">
+                                    <CardCornerDecor />
+
+                                    {(() => {
+                                        const currentChat = chats.find(c => c.id === activeChatId);
+                                        if (!currentChat) return <div className="m-auto text-cozy-textMuted text-xs">No conversations selected.</div>;
+
+                                        return (
+                                            <React.Fragment>
+                                                {/* Header info */}
+                                                <div className="p-4 border-b border-cozy-border flex justify-between items-center bg-cozy-bg">
+                                                    <div className="flex items-center space-x-3">
+                                                        <img src={currentChat.partner.avatar} className="w-9 h-9 rounded-full object-cover" />
+                                                        <div>
+                                                            <div className="text-xs font-bold text-cozy-primary flex items-center">
+                                                                <span>{currentChat.partner.name}</span>
+                                                                {currentChat.partner.verified && <VerifiedBadge />}
+                                                            </div>
+                                                            <span className="text-[9px] text-cozy-textMuted font-bold uppercase">{currentChat.partner.university}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-[9px] text-cozy-textMuted uppercase block">Regarding</span>
+                                                        <span className="text-xs font-bold text-cozy-primary line-clamp-1 max-w-[200px]">{currentChat.listingTitle}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Messages body */}
+                                                <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-cozy-bg/30">
+                                                    {currentChat.messages.map((msg, idx) => (
+                                                        <div key={idx} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
+                                                            <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-xs shadow-xs border ${msg.sender === 'me' ? 'bg-cozy-primary text-white border-cozy-primary' : 'bg-white border-cozy-border text-cozy-textDark'}`}>
+                                                                <p className="leading-relaxed">{msg.text}</p>
+                                                                <span className="text-[8px] block mt-1 opacity-75 uppercase tracking-wider text-right">{msg.time}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Messages Form */}
+                                                <form onSubmit={handleSendMessage} className="p-4 border-t border-cozy-border bg-cozy-bg flex items-center space-x-3">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Type a safe, friendly message to your host..." 
+                                                        value={typedMessage}
+                                                        onChange={(e) => setTypedMessage(e.target.value)}
+                                                        className="flex-1 bg-white border border-cozy-border rounded-full px-4 py-3 text-xs text-cozy-textDark placeholder-cozy-textMuted focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                    />
+                                                    <button 
+                                                        type="submit" 
+                                                        className="bg-cozy-accent hover:bg-cozy-accent/90 text-white font-bold text-xs uppercase tracking-wider px-6 py-3 rounded-full cursor-none transition-all shadow-xs"
+                                                    >
+                                                        Send
+                                                    </button>
+                                                </form>
+                                            </React.Fragment>
+                                        );
+                                    })()}
+                                </main>
+
+                            </div>
+                        )}
+
+                        {/* --- POST SUBLET FORM VIEW --- */}
+                        {view === 'post' && (
+                            <div className="max-w-3xl mx-auto px-4 py-12">
+                                <div className="bg-cozy-bgCard border border-cozy-border rounded-3xl p-8 relative space-y-6 cozy-shadow">
+                                    <CardCornerDecor />
+
+                                    <div className="border-b border-cozy-border pb-4">
+                                        <h2 className="text-2xl font-serif italic text-cozy-primary">
+                                            Broadcast a Cozy Student Space
+                                        </h2>
+                                        <p className="text-xs text-cozy-textMuted mt-1">
+                                            List your room for student timelines. Keep listings structured and highly transparent.
+                                        </p>
+                                    </div>
+
+                                    <form onSubmit={handleCreateListing} className="space-y-6 text-xs text-cozy-textDark">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Sublet Post Title</label>
+                                                <input 
+                                                    type="text" 
+                                                    required
+                                                    placeholder="e.g. Spacious Sunny Master Suite with Balcony"
+                                                    value={newListing.title}
+                                                    onChange={(e) => setNewListing({...newListing, title: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Campus Neighborhood</label>
+                                                <select 
+                                                    value={newListing.university}
+                                                    onChange={(e) => setNewListing({...newListing, university: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                >
+                                                    <option>UC Berkeley</option>
+                                                    <option>NYU</option>
+                                                    <option>UT Austin</option>
+                                                    <option>Georgia Tech</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Monthly Rent (USD)</label>
+                                                <input 
+                                                    type="number" 
+                                                    required
+                                                    placeholder="e.g. 1150"
+                                                    value={newListing.rent}
+                                                    onChange={(e) => setNewListing({...newListing, rent: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Target Semester Slot</label>
+                                                <select 
+                                                    value={newListing.term}
+                                                    onChange={(e) => setNewListing({...newListing, term: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                >
+                                                    <option>Fall 2026</option>
+                                                    <option>Spring 2027</option>
+                                                    <option>Summer 2026</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Available Timeline (Dates)</label>
+                                                <input 
+                                                    type="text" 
+                                                    required
+                                                    placeholder="e.g. Aug 20, 2026 - Dec 15, 2026"
+                                                    value={newListing.dates}
+                                                    onChange={(e) => setNewListing({...newListing, dates: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Furnishing State</label>
+                                                <select 
+                                                    value={newListing.furnishing}
+                                                    onChange={(e) => setNewListing({...newListing, furnishing: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                >
+                                                    <option>Fully Furnished</option>
+                                                    <option>Partially Furnished</option>
+                                                    <option>Unfurnished</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-1.5 md:col-span-2">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Roommate Context</label>
+                                                <input 
+                                                    type="text" 
+                                                    required
+                                                    placeholder="e.g. You'll live with 2 quiet female junior Architecture majors"
+                                                    value={newListing.roommates}
+                                                    onChange={(e) => setNewListing({...newListing, roommates: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5 md:col-span-2">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Primary Vibe Tag</label>
+                                                <select 
+                                                    value={newListing.tag}
+                                                    onChange={(e) => setNewListing({...newListing, tag: e.target.value})}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-2.5 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                >
+                                                    <option>Quiet Study Friendly</option>
+                                                    <option>Social Community</option>
+                                                    <option>Workplace Ready</option>
+                                                    <option>Cozy & Quiet</option>
+                                                    <option>Pet Friendly</option>
+                                                    <option>Creative Loft</option>
+                                                </select>
+                                            </div>
+
+                                        </div>
+
+                                        {/* Sublet compliance checkbox */}
+                                        <div className="py-4 border-t border-b border-cozy-border space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted block">Official Landlord Authorization</label>
+                                            <div className="space-y-2">
+                                                <label className="flex items-center space-x-2 text-cozy-textDark cursor-none">
+                                                    <input 
+                                                        type="radio" 
+                                                        name="landlordApproved" 
+                                                        checked={newListing.landlordApproved === true}
+                                                        onChange={() => setNewListing({...newListing, landlordApproved: true})}
+                                                        className="accent-cozy-accent w-4 h-4"
+                                                    />
+                                                    <span>Yes, the landlord or leasing office has explicitly approved subleasing templates</span>
+                                                </label>
+                                                <label className="flex items-center space-x-2 text-cozy-textDark cursor-none">
+                                                    <input 
+                                                        type="radio" 
+                                                        name="landlordApproved" 
+                                                        checked={newListing.landlordApproved === false}
+                                                        onChange={() => setNewListing({...newListing, landlordApproved: false})}
+                                                        className="accent-cozy-accent w-4 h-4"
+                                                    />
+                                                    <span>No, formal landlord permission is currently pending request</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted">Full Descriptive Story</label>
+                                            <textarea 
+                                                rows="4"
+                                                required
+                                                placeholder="Tell peers about building amenities, walkability scores, study environments, and utility allocations..."
+                                                value={newListing.description}
+                                                onChange={(e) => setNewListing({...newListing, description: e.target.value})}
+                                                className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-3 text-cozy-textDark focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                            ></textarea>
+                                        </div>
+
+                                        <div className="flex justify-between items-center pt-4 border-t border-cozy-border">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setView('marketplace')} 
+                                                className="text-cozy-textMuted hover:text-cozy-primary font-bold uppercase tracking-wider text-[11px]"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                type="submit" 
+                                                className="bg-cozy-accent hover:bg-cozy-accent/90 text-white font-bold uppercase tracking-wider px-8 py-3.5 rounded-full transition-all"
+                                            >
+                                                Broadcast active sublet
+                                            </button>
+                                        </div>
+
+                                    </form>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- HOUSING DETAIL MODAL DETAIL PANEL --- */}
+                        {selectedListing && (
+                            <div className="fixed inset-0 bg-cozy-primary/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                                <div className="bg-cozy-bgCard rounded-3xl overflow-hidden max-w-2xl w-full border border-cozy-border flex flex-col max-h-[90vh] relative shadow-lg">
+                                    <CardCornerDecor />
+
+                                    {/* Photo cover header */}
+                                    <div className="h-64 relative overflow-hidden bg-cozy-bg shrink-0">
+                                        <img src={selectedListing.image} className="object-cover w-full h-full" alt="apartment" />
+                                        <button 
+                                            onClick={() => setSelectedListing(null)} 
+                                            className="absolute top-4 right-4 bg-white hover:bg-cozy-bg text-cozy-primary border border-cozy-border rounded-full p-2.5 cursor-none shadow-sm transition-all"
+                                        >
+                                            ✕
+                                        </button>
+                                        <div className="absolute bottom-4 left-4 bg-white border border-cozy-border font-bold text-[10px] px-3.5 py-1.5 rounded-full text-cozy-primary">
+                                            {selectedListing.term}
+                                        </div>
+                                    </div>
+
+                                    {/* Specs details scroll box */}
+                                    <div className="p-6 overflow-y-auto space-y-6 text-xs text-cozy-textDark">
+                                        
+                                        <div className="space-y-1">
+                                            <div className="flex items-center space-x-2 text-[10px] font-bold">
+                                                <span className="text-cozy-accent uppercase bg-cozy-accentLight px-2.5 py-1 rounded-full">[{selectedListing.university}]</span>
+                                                <span className="text-cozy-textMuted uppercase">{selectedListing.dates}</span>
+                                            </div>
+                                            <h3 className="text-2xl font-extrabold text-cozy-primary font-serif italic mt-1">{selectedListing.title}</h3>
+                                        </div>
+
+                                        {/* Dynamic telemetry board */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4 border-b border-cozy-border">
+                                            <div className="bg-cozy-bg p-3.5 rounded-2xl text-center border border-cozy-border">
+                                                <span className="text-[10px] uppercase font-bold text-cozy-textMuted">Monthly Rent</span>
+                                                <p className="font-extrabold text-cozy-primary text-base mt-0.5">${selectedListing.rent}<span className="text-xs font-normal">/mo</span></p>
+                                            </div>
+                                            <div className="bg-cozy-bg p-3.5 rounded-2xl text-center border border-cozy-border">
+                                                <span className="text-[10px] uppercase font-bold text-cozy-textMuted">Furnishing</span>
+                                                <p className="font-bold text-cozy-primary text-[11px] truncate uppercase mt-1.5">{selectedListing.furnishing}</p>
+                                            </div>
+                                            <div className="bg-cozy-bg p-3.5 rounded-2xl text-center border border-cozy-border">
+                                                <span className="text-[10px] uppercase font-bold text-cozy-textMuted">Community</span>
+                                                <p className="font-bold text-cozy-accent text-[11px] truncate uppercase mt-1.5">{selectedListing.tag}</p>
+                                            </div>
+                                            <div className="bg-cozy-bg p-3.5 rounded-2xl text-center border border-cozy-border">
+                                                <span className="text-[10px] uppercase font-bold text-cozy-textMuted">Landlord OK</span>
+                                                <p className="font-bold text-cozy-sage text-[11px] truncate uppercase mt-1.5">{selectedListing.landlordApproved ? 'Authorized' : 'Pending'}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Copywriting */}
+                                        <div className="space-y-1.5">
+                                            <span className="text-[10px] uppercase font-bold text-cozy-accent block">The Description</span>
+                                            <p className="text-cozy-textMuted leading-relaxed text-xs">{selectedListing.description}</p>
+                                        </div>
+
+                                        {/* Verified profile banner card - Twitter Blue Rosette Checkmark */}
+                                        <div className="bg-cozy-bg p-4 border border-cozy-border rounded-2xl flex items-center justify-between">
+                                            <div className="flex items-center space-x-3">
+                                                <img src={selectedListing.host.avatar} className="w-11 h-11 rounded-full object-cover border border-cozy-border" />
+                                                <div>
+                                                    <div className="font-bold text-cozy-primary text-xs flex items-center">
+                                                        <span>{selectedListing.host.name}</span>
+                                                        {selectedListing.host.verified && <VerifiedBadge />}
+                                                    </div>
+                                                    <div className="text-[10px] text-cozy-textMuted">{selectedListing.host.major}</div>
+                                                    <div className="text-[9px] text-cozy-accent uppercase font-semibold mt-0.5">{selectedListing.host.email}</div>
+                                                </div>
+                                            </div>
+                                            <span className="bg-cozy-accentLight text-cozy-accent text-[10px] font-bold px-3 py-1.5 rounded-full font-semibold">
+                                                Linked Node
+                                            </span>
+                                        </div>
+
+                                    </div>
+
+                                    {/* Buttons controls bar */}
+                                    <div className="p-4 border-t border-cozy-border bg-cozy-bg flex space-x-3 shrink-0">
+                                        <button 
+                                            onClick={() => setSelectedListing(null)} 
+                                            className="w-1/3 border border-cozy-border hover:bg-cozy-bgCard bg-white font-bold text-xs py-3.5 rounded-full text-cozy-textMuted hover:text-cozy-primary transition-all cursor-none"
+                                        >
+                                            Close View
+                                        </button>
+                                        <button 
+                                            onClick={() => handleContactHost(selectedListing)}
+                                            className="w-2/3 bg-cozy-primary hover:bg-cozy-primary/90 text-white font-bold text-xs py-3.5 rounded-full hover:shadow-sm transition-all cursor-none"
+                                        >
+                                            Message Student Host
+                                        </button>
+                                    </div>
+
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- HIGH CONVERSION ACADEMIC EDUCATION MODAL --- */}
+                        {showVerifyModal && (
+                            <div className="fixed inset-0 bg-cozy-primary/45 backdrop-blur-md flex items-center justify-center z-50 p-4">
+                                <form onSubmit={handleVerificationSubmit} className="bg-cozy-bgCard rounded-3xl p-8 max-w-md w-full border border-cozy-border shadow-lg space-y-5 relative">
+                                    <CardCornerDecor />
+
+                                    <div className="text-center space-y-2 relative z-10">
+                                        <div className="w-12 h-12 rounded-full bg-cozy-accentLight border border-cozy-accent/20 flex items-center justify-center mx-auto text-cozy-accent text-lg shadow-xs">
+                                            🎓
+                                        </div>
+                                        <h3 className="font-extrabold text-sm text-cozy-primary uppercase tracking-wider">Link Your University Address</h3>
+                                        <p className="text-cozy-textMuted text-xs leading-relaxed max-w-xs mx-auto">
+                                            To maintain our 100% scam-free workspace, only users with authentic active academic (.edu) emails may list spaces.
+                                        </p>
+                                    </div>
+
+                                    {/* Verification process bar */}
+                                    {verifying ? (
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between text-[10px] uppercase font-bold text-cozy-sage">
+                                                <span>Verifying academic server node...</span>
+                                                <span>{verifyProgress}%</span>
+                                            </div>
+                                            <div className="w-full bg-cozy-bg h-2 border border-cozy-border rounded-full overflow-hidden">
+                                                <div 
+                                                    className="bg-cozy-sage h-full transition-all duration-150"
+                                                    style={{ width: `${verifyProgress}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="text-center text-[10px] text-cozy-textMuted italic animate-pulse">
+                                                Establishing direct campus linkage handshake...
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <React.Fragment>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-cozy-textMuted block">Your University Email (.edu)</label>
+                                                <input 
+                                                    type="email" 
+                                                    required
+                                                    placeholder="e.g. name@berkeley.edu, name@nyu.edu"
+                                                    value={emailInput}
+                                                    onChange={(e) => setEmailInput(e.target.value)}
+                                                    className="w-full bg-cozy-bg border border-cozy-border rounded-xl px-4 py-3 text-xs text-cozy-textDark placeholder-cozy-textMuted focus:outline-none focus:ring-1 focus:ring-cozy-accent"
+                                                />
+                                                <p className="text-[10px] text-cozy-textMuted">Must terminate with .edu suffix</p>
+                                            </div>
+
+                                            <div className="flex space-x-3 pt-2">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => setShowVerifyModal(false)} 
+                                                    className="w-1/2 border border-cozy-border hover:bg-cozy-bg bg-white text-xs py-3 rounded-full text-cozy-textMuted hover:text-cozy-primary transition-all cursor-none"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button 
+                                                    type="submit" 
+                                                    className="w-1/2 bg-cozy-accent hover:bg-cozy-accent/90 text-white font-bold text-xs py-3 rounded-full transition-all cursor-none shadow-xs"
+                                                >
+                                                    Confirm Address
+                                                </button>
+                                            </div>
+                                        </React.Fragment>
+                                    )}
+
+                                </form>
+                            </div>
+                        )}
+
+                    </main>
+
+                    {/* --- SYSTEM FOOTER --- */}
+                    <footer className="bg-cozy-primary py-12 px-4 lg:px-12 text-xs text-cozy-border/75">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="flex items-center space-x-2">
+                                <span className="font-extrabold text-white tracking-widest text-base uppercase">Student<span className="text-cozy-accent">Pad</span></span>
+                            </div>
+                            <p className="uppercase tracking-widest text-[9px] text-center md:text-left">© 2026 StudentPad Systems. Verified sublease protocol active.</p>
+                            <div className="flex space-x-5 uppercase tracking-widest text-[9px] font-bold">
+                                <a href="#" className="hover:text-cozy-accent transition-colors">Trust & Safety</a>
+                                <a href="#" className="hover:text-cozy-accent transition-colors">Pre-Approved Leases</a>
+                                <a href="#" className="hover:text-white transition-colors">Support Portal</a>
+                            </div>
+                        </div>
+                    </footer>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
